@@ -1,13 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from .database import SessionLocal, engine
-from .models import Base, User
-from .auth import get_password_hash, verify_password, create_access_token, get_current_user
-from .routers import issues, users, admin, notifications, social, profile
 from pydantic import BaseModel
 from typing import Optional
+
+from .database import SessionLocal, engine
+from . import models
+from .models import Base, User, Post # Make sure to import Post here
+from .auth import get_password_hash, verify_password, create_access_token, get_current_user
+from .routers import issues, users, admin, notifications, social, profile
+
+
 
 # Create tables automatically on startup
 Base.metadata.create_all(bind=engine)
@@ -17,8 +24,8 @@ app = FastAPI(
     description="A comprehensive system for reporting and managing civic issues",
     version="1.0.0"
 )
-
-# Add CORS middleware
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure this properly for production
@@ -48,13 +55,34 @@ class UserSignup(BaseModel):
     password: str
     phone: Optional[str] = None
 
-@app.get("/")
-def read_root():
-    return {
-        "message": "Civic Issue Reporting System API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+@app.get("/", response_class=HTMLResponse)
+def read_root(request: Request, db: Session = Depends(get_db)):
+    """
+    This is the main feed page. It gets all posts from the DB
+    and renders the feed.html template.
+    """
+    try:
+        # Fetch all posts from the database, newest first
+        posts = db.query(models.Post).order_by(models.Post.id.desc()).all()
+        
+        # Return the HTML template, passing in the posts data
+        return templates.TemplateResponse("feed.html", {"request": request, "posts": posts})
+    except Exception as e:
+        # If there's an error, return a simple HTML page
+        return HTMLResponse(f"""
+        <html>
+        <head><title>Civic Backend</title></head>
+        <body>
+            <h1>Civic Issue Reporting System</h1>
+            <p>Server is running! Error: {str(e)}</p>
+            <p><a href="/docs">API Documentation</a></p>
+        </body>
+        </html>
+        """)
+
+@app.get("/test")
+def test_endpoint():
+    return {"message": "Server is working!", "status": "ok"}
 
 @app.post("/signup")
 def signup(user_data: UserSignup, db: Session = Depends(get_db)):

@@ -48,8 +48,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    issues = relationship("Issue", back_populates="reporter")
-    assigned_issues = relationship("Issue", back_populates="assigned_to")
+    issues = relationship("Issue", back_populates="reporter", foreign_keys="[Issue.reporter_id]")
+    assigned_issues = relationship("Issue", back_populates="assigned_to", foreign_keys="[Issue.assigned_to_id]")
     votes = relationship("IssueVote", back_populates="user")
     badges = relationship("UserBadge", back_populates="user")
     comments = relationship("IssueComment", back_populates="user")
@@ -164,3 +164,13 @@ class IssueComment(Base):
     
     issue = relationship("Issue")
     user = relationship("User")
+class Post(Base):
+    __tablename__ = "posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True)
+    title = Column(String, index=True)
+    description = Column(String)
+    photo_filename = Column(String, nullable=True)
+    status = Column(String, default="Submitted")
+    upvotes = Column(Integer, default=0)
