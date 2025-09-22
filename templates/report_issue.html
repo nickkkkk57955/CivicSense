@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="col-lg-8 mx-auto">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="mb-3">Report an Issue</h2>
+            <form id="report-form" action="/issues/with-photo" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    <select name="category" class="form-select" required>
+                        <option value="road_maintenance">Road Maintenance</option>
+                        <option value="streetlight">Streetlight</option>
+                        <option value="sanitation">Sanitation</option>
+                        <option value="water_supply">Water Supply</option>
+                        <option value="electricity">Electricity</option>
+                        <option value="traffic">Traffic</option>
+                        <option value="parks">Parks</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Latitude</label>
+                        <input type="number" step="any" name="latitude" id="lat" class="form-control" required />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Longitude</label>
+                        <input type="number" step="any" name="longitude" id="lon" class="form-control" required />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Address</label>
+                    <input type="text" name="address" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-select">
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Photo</label>
+                    <input type="file" name="photo" accept="image/*" class="form-control" required />
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+                <div id="msg" class="mt-2"></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Attempt to auto-fill geolocation
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('lon').value = pos.coords.longitude.toFixed(6);
+  });
+}
+</script>
+{% endblock %}
+
+

@@ -4,20 +4,15 @@ from typing import List, Optional
 from datetime import datetime
 import json
 import os
-from ..database import SessionLocal
+import shutil
+from ..database import get_db
 from ..models import Issue, User, IssueStatus, IssuePriority, IssueCategory, IssueUpdate, Notification
 from ..auth import get_current_user
 from ..services.karma import KarmaService
 from pydantic import BaseModel
+from .. import schemas
 
 router = APIRouter(prefix="/issues", tags=["issues"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 class IssueCreate(BaseModel):
     title: str
@@ -96,6 +91,53 @@ async def create_issue(
     
     db.commit()
     
+    return issue
+
+
+@router.post("/with-photo", response_model=schemas.Issue)
+async def create_issue_with_photo(
+    title: str = Form(...),
+    description: str = Form(...),
+    category: IssueCategory = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    address: Optional[str] = Form(None),
+    priority: IssuePriority = Form(IssuePriority.MEDIUM),
+    photo: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new civic issue with a photo in one request."""
+    upload_dir = "static/images/issues"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    ext = photo.filename.split(".")[-1] if "." in photo.filename else "jpg"
+    unique_filename = f"issue_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{current_user.id}.{ext}"
+    file_path = os.path.join(upload_dir, unique_filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
+
+    photo_url = f"/static/images/issues/{unique_filename}"
+
+    issue = Issue(
+        title=title,
+        description=description,
+        category=category,
+        latitude=latitude,
+        longitude=longitude,
+        address=address,
+        priority=priority,
+        reporter_id=current_user.id,
+        photo_urls=json.dumps([photo_url])
+    )
+
+    db.add(issue)
+    db.commit()
+    db.refresh(issue)
+
+    KarmaService(db).award_karma(current_user.id, 10, f"Reported issue: {issue.title}")
+
     return issue
 
 @router.get("/", response_model=List[IssueResponse])
@@ -214,46 +256,7 @@ async def update_issue(
     
     return issue
 
-@router.post("/{issue_id}/upload-photo")
-async def upload_issue_photo(
-    issue_id: int,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Upload a photo for an issue"""
-    issue = db.query(Issue).filter(Issue.id == issue_id).first()
-    
-    if not issue:
-        raise HTTPException(status_code=404, detail="Issue not found")
-    
-    # Citizens can only upload to their own issues
-    if current_user.role == "citizen" and issue.reporter_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to upload photos to this issue")
-    
-    # Create uploads directory if it doesn't exist
-    upload_dir = "uploads/issues"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Generate unique filename
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    filename = f"issue_{issue_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{file_extension}"
-    file_path = os.path.join(upload_dir, filename)
-    
-    # Save file
-    with open(file_path, "wb") as buffer:
-        content = await file.read()
-        buffer.write(content)
-    
-    # Update issue with photo URL
-    photo_url = f"/uploads/issues/{filename}"
-    existing_photos = json.loads(issue.photo_urls) if issue.photo_urls else []
-    existing_photos.append(photo_url)
-    issue.photo_urls = json.dumps(existing_photos)
-    
-    db.commit()
-    
-    return {"message": "Photo uploaded successfully", "photo_url": photo_url}
+## Note: legacy upload endpoint removed; creation now supports photo upload
 
 @router.get("/{issue_id}/updates")
 async def get_issue_updates(
