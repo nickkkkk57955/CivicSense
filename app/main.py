@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .database import engine, get_db
-from .routers import auth_router, issues, web_auth_router # Import the new router
+from .routers import auth_router, issues, web_auth_router, social, profile, admin, notifications, users
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -19,7 +19,11 @@ templates = Jinja2Templates(directory="templates")
 # Include your API routers
 app.include_router(auth_router.router)
 app.include_router(issues.router)
-# (Include other API routers here)
+app.include_router(social.router)
+app.include_router(profile.router)
+app.include_router(admin.router)
+app.include_router(notifications.router)
+app.include_router(users.router)
 
 # Include your WEB FORM router
 app.include_router(web_auth_router.router)
